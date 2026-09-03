@@ -30,7 +30,7 @@ export default function GeminiAgentFeed({ reasoningResult, loading }) {
     );
   }
 
-  const isFallback = reasoningResult.reasoning_steps?.some(s => s.includes("fallback") || s.includes("MOCKED"));
+  const geminiStatusLabel = reasoningResult.last_gemini_status || (reasoningResult.reasoning_steps?.some(s => s.includes("MOCKED")) ? "FALLBACK MODE" : "LIVE");
 
   return (
     <div className="glass-card p-6 flex flex-col justify-between h-full border border-white/5 bg-[#0a0b10] rounded-none">
@@ -45,11 +45,12 @@ export default function GeminiAgentFeed({ reasoningResult, loading }) {
 
           <div className="flex gap-2">
             <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-none border flex items-center gap-1.5 ${
-              isFallback 
-                ? 'bg-slate-500/5 text-slate-400 border-slate-500/10' 
+              geminiStatusLabel === "FALLBACK MODE"
+                ? 'bg-amber-500/5 text-amber-400 border-amber-500/10' 
                 : 'bg-emerald-500/5 text-emerald-400 border-emerald-500/10'
             }`}>
-              {isFallback ? 'DYNAMIC RESOLUTION' : 'LIVE GEMINI'}
+              <span className={`w-1.5 h-1.5 rounded-full ${geminiStatusLabel === "FALLBACK MODE" ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+              {geminiStatusLabel}
             </span>
             <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-500/5 px-2 py-0.5 rounded-none border border-white/5">
               LATENCY: {reasoningResult.resolution_time_seconds || '6.2'}s

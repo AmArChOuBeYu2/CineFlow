@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { History, ExternalLink, ChevronDown, ChevronUp, FileText, Activity } from 'lucide-react';
 
-export default function IncidentHistory({ history, onSelectIncident }) {
+export default function IncidentHistory({ history = [], onSelectIncident }) {
   const [expandedRows, setExpandedRows] = useState({});
+  const safeHistory = Array.isArray(history) ? history : [];
 
   const toggleRow = (id, inc, e) => {
     // Avoid toggling when clicking links
@@ -118,7 +119,7 @@ export default function IncidentHistory({ history, onSelectIncident }) {
       </div>
 
       <div className="overflow-x-auto">
-        {history.length === 0 ? (
+        {safeHistory.length === 0 ? (
           <div className="text-center py-8 text-slate-500 text-xs font-mono uppercase tracking-wider">
             No incidents logged in this session yet. Inject a fault module to begin.
           </div>
@@ -134,7 +135,7 @@ export default function IncidentHistory({ history, onSelectIncident }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-[11px]">
-              {history.map((inc) => {
+              {safeHistory.map((inc) => {
                 const isExpanded = !!expandedRows[inc.incident_id];
                 const postmortemText = inc.postmortem_markdown || 
                   `# Incident Postmortem: ${inc.incident_id}\n\n## Summary\n- **Incident Title:** ${inc.title}\n- **Target Node:** \`${inc.node_id}\`\n- **Impact:** ${inc.severity} severity.\n\n## Remediation\n> ${inc.remediation_action}`;

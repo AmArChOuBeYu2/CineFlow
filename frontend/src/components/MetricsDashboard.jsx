@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, Zap, Link, Clock, RefreshCw } from 'lucide-react';
 
-export default function MetricsDashboard({ metrics, incidentCount, mttrSeconds }) {
+export default function MetricsDashboard({ metrics = {}, incidentCount = 0, mttrSeconds = 0 }) {
   const [lastPolled, setLastPolled] = useState('');
+  const safeMetrics = metrics || {};
+  const taskExecutions = safeMetrics.task_executions || 0;
+  const fallbackCount = safeMetrics.fallback_count || 0;
 
   useEffect(() => {
     setLastPolled(new Date().toLocaleTimeString());
@@ -13,7 +16,7 @@ export default function MetricsDashboard({ metrics, incidentCount, mttrSeconds }
     return `${parseFloat(sec).toFixed(1)}s`;
   };
 
-  const liveCount = Math.max(0, metrics.task_executions - metrics.fallback_count);
+  const liveCount = Math.max(0, taskExecutions - fallbackCount);
 
   return (
     <div className="flex flex-col gap-2 mb-6">

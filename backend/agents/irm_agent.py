@@ -33,8 +33,11 @@ class GeminiSREAgent:
         # Step 1: Query Grafana Cloud MCP Tools
         if simulator.active_incident: simulator.active_incident["stage"] = "LOKI"
         loki_logs = grafana_mcp.query_loki_logs(f'{{node="{node_id}"}} |= "ERROR"')
+        time.sleep(0.8)
+
         if simulator.active_incident: simulator.active_incident["stage"] = "TEMPO"
         tempo_traces = grafana_mcp.get_tempo_trace(node_id)
+        time.sleep(0.8)
 
         # Step 2: Build Live Prompt for Gemini Flash Model
         prompt = f"""
@@ -121,11 +124,13 @@ class GeminiSREAgent:
         duration = round(time.time() - start_time, 2)
 
         # Step 4: Execute SRE Fix in Simulator & Grafana IRM
+        time.sleep(0.8)
         if simulator.active_incident: simulator.active_incident["stage"] = "REMEDIATE"
         action_taken = result_data.get("action_taken", f"Restarted worker process on {node_id}")
         grafana_mcp.resolve_incident(incident_id, action_taken)
 
         # Step 5: Post Postmortem back to Grafana IRM & Grafana Annotations API
+        time.sleep(0.8)
         if simulator.active_incident: simulator.active_incident["stage"] = "POSTMORTEM"
         postmortem_md = result_data.get("postmortem_markdown", "# Postmortem")
         grafana_mcp.post_postmortem(incident_id, postmortem_md)
@@ -138,6 +143,7 @@ class GeminiSREAgent:
             "reasoning_steps": result_data.get("reasoning_steps", []),
             "postmortem_markdown": postmortem_md,
             "resolution_time_seconds": duration,
+            "last_gemini_status": simulator.last_gemini_status,
             "is_live_gemini_llm": bool(self.client and raw_llm_response is not None),
             "raw_llm_response_snippet": raw_llm_response[:200] if raw_llm_response else None
         }

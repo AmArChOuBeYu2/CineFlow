@@ -28,30 +28,49 @@ class FaultTriggerRequest(BaseModel):
     fault_type: str  # gpu_memory_leak, corrupt_texture_asset, runaway_agent_loop
 
 @app.get("/health")
-def health_check():
+@app.get("/health/")
+@app.get("/api/health")
+@app.get("/api/health/")
+def health_check(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     return {
         "status": "healthy",
         "service": "CineFlow IRM Engine",
         "grafana_url": config.GRAFANA_URL,
         "demo_mode": config.DEMO_MODE,
-        "gemini_api_configured": bool(config.GEMINI_API_KEY)
+        "gemini_api_configured": bool(config.GEMINI_API_KEY and config.GEMINI_API_KEY != "PASTE_YOUR_GEMINI_API_KEY_HERE")
     }
 
 @app.get("/metrics")
+@app.get("/metrics/")
+@app.get("/api/metrics")
+@app.get("/api/metrics/")
 def get_metrics():
     """Prometheus metrics endpoint scrapable by Grafana Cloud Agent / Alloy."""
     data = metrics_mgr.get_prometheus_metrics()
-    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+    return Response(
+        content=data,
+        media_type=CONTENT_TYPE_LATEST,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        }
+    )
 
 @app.get("/api/cluster-status")
-def get_cluster_status():
+@app.get("/api/cluster-status/")
+def get_cluster_status(response: Response):
     """Get real-time render farm node matrix and active incidents."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     status = simulator.get_cluster_status()
     status["demo_mode"] = config.DEMO_MODE
     status["gemini_api_configured"] = bool(config.GEMINI_API_KEY and config.GEMINI_API_KEY != "PASTE_YOUR_GEMINI_API_KEY_HERE")
     return status
 
 @app.post("/api/trigger-fault")
+@app.post("/api/trigger-fault/")
 def trigger_fault(req: FaultTriggerRequest):
     """Trigger a simulated studio render farm or AI agent fault."""
     valid_faults = ["gpu_memory_leak", "corrupt_texture_asset", "runaway_agent_loop"]
@@ -116,6 +135,7 @@ async def handle_grafana_alert_webhook(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/run-sre-agent")
+@app.post("/api/run-sre-agent/")
 def run_sre_agent():
     """Execute Gemini SRE Agent to investigate incident via Grafana MCP and remediate."""
     active_incident = simulator.active_incident
@@ -126,10 +146,15 @@ def run_sre_agent():
     return result
 
 @app.get("/api/incident-history")
-def get_incident_history():
+@app.get("/api/incident-history/")
+def get_incident_history(response: Response):
     """Get log history of resolved incidents and postmortems."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     return simulator.incident_history
 
 if __name__ == "__main__":
+    import os
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

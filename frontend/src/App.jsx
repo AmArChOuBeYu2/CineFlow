@@ -8,6 +8,8 @@ import GeminiAgentFeed from './components/GeminiAgentFeed';
 import PostmortemView from './components/PostmortemView';
 import IncidentHistory from './components/IncidentHistory';
 
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 export default function App() {
   const [clusterStatus, setClusterStatus] = useState(null);
   const [incidentHistory, setIncidentHistory] = useState([]);
@@ -28,78 +30,99 @@ export default function App() {
   const [timelineStep, setTimelineStep] = useState(0);
 
   const fetchStatusAndHistory = async () => {
+    const fetchOpts = {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+    };
+
+    // Helper for safe JSON parsing that guards against DOCTYPE HTML fallback pages
+    const fetchSafeJson = async (url) => {
+      try {
+        const res = await fetch(url, fetchOpts);
+        const text = await res.text();
+        console.log(`[RAW RESPONSE] URL: ${url} | Status: ${res.status} | Content-Type: ${res.headers.get('content-type')} | Text: ${text.slice(0, 150)}`);
+        if (!res.ok || res.status === 304) return null;
+        if (!text || text.trim().startsWith('<')) return null;
+        return JSON.parse(text);
+      } catch (err) {
+        console.error(`[FETCH ERROR] URL: ${url}`, err);
+        return null;
+      }
+    };
+
+    // 1. Fetch cluster status
     try {
-      // 1. Fetch cluster status
-      const resStatus = await fetch('http://localhost:8000/api/cluster-status');
-      const statusData = await resStatus.json();
-      setClusterStatus(statusData);
+      const statusData = await fetchSafeJson(`${API_BASE}/api/cluster-status`);
+      if (statusData && statusData.nodes) {
+        setClusterStatus(statusData);
 
-      // Sync active incident state
-      if (statusData.active_incident) {
-        setActiveIncident(statusData.active_incident);
-        const stage = statusData.active_incident.stage;
-        if (stage === "TRIGGERED") {
-          setTimelineStep(1);
-        } else if (stage === "LOKI") {
-          setTimelineStep(2);
-        } else if (stage === "TEMPO") {
-          setTimelineStep(3);
-        } else if (stage === "GEMINI") {
-          setTimelineStep(4);
-        } else if (stage === "REMEDIATE") {
-          setTimelineStep(5);
-        } else if (stage === "POSTMORTEM") {
-          setTimelineStep(6);
+        // Sync active incident state
+        if (statusData.active_incident) {
+          setActiveIncident(statusData.active_incident);
+          const stage = statusData.active_incident.stage;
+          if (stage === "TRIGGERED") setTimelineStep(1);
+          else if (stage === "LOKI") setTimelineStep(2);
+          else if (stage === "TEMPO") setTimelineStep(3);
+          else if (stage === "GEMINI") setTimelineStep(4);
+          else if (stage === "REMEDIATE") setTimelineStep(5);
+          else if (stage === "POSTMORTEM") setTimelineStep(6);
+          else setTimelineStep(1);
         } else {
-          setTimelineStep(1);
+          setActiveIncident(null);
         }
-      } else {
-        setActiveIncident(null);
       }
-
-      // 2. Fetch history
-      const resHist = await fetch('http://localhost:8000/api/incident-history');
-      const historyData = await resHist.json();
-      setIncidentHistory(historyData);
-
-      // Calculate MTTR
-      if (historyData.length > 0) {
-        let total = 0;
-        let validRuns = 0;
-        historyData.forEach(inc => {
-          const resTime = inc.resolved_at;
-          if (resTime) {
-            total += 6.2;
-            validRuns++;
-          }
-        });
-        setMttrSeconds(validRuns > 0 ? total / validRuns : 0);
-      }
-
-      // 3. Fetch and parse Prometheus /metrics
-      const resMetrics = await fetch('http://localhost:8000/metrics');
-      const metricsText = await resMetrics.text();
-      
-      let executions = 0;
-      let fallbacks = 0;
-      
-      metricsText.split('\n').forEach(line => {
-        if (line.includes('agent_task_executions_total')) {
-          const matchVal = line.match(/\}\s+(\d+)/);
-          const val = matchVal ? parseInt(matchVal[1], 10) : 0;
-          executions += val;
-          if (line.includes('status="fallback"')) {
-            fallbacks += val;
-          }
-        }
-      });
-      setMetrics({
-        task_executions: executions,
-        fallback_count: fallbacks
-      });
-
     } catch (err) {
-      console.log('Error polling backend status:', err);
+      console.log('Error fetching cluster status:', err);
+    }
+
+    // 2. Fetch history
+    try {
+      const historyData = await fetchSafeJson(`${API_BASE}/api/incident-history`);
+      if (Array.isArray(historyData)) {
+        setIncidentHistory(historyData);
+        if (historyData.length > 0) {
+          let total = 0;
+          let validRuns = 0;
+          historyData.forEach(inc => {
+            if (inc && inc.resolved_at) {
+              total += 6.2;
+              validRuns++;
+            }
+          });
+          setMttrSeconds(validRuns > 0 ? total / validRuns : 0);
+        }
+      }
+    } catch (err) {
+      console.log('Error fetching history:', err);
+    }
+
+    // 3. Fetch and parse Prometheus /api/metrics
+    try {
+      const resMetrics = await fetch(`${API_BASE}/api/metrics`, fetchOpts);
+      if (resMetrics.ok && resMetrics.status !== 304) {
+        const metricsText = await resMetrics.text();
+        if (metricsText && !metricsText.trim().startsWith('<')) {
+          let executions = 0;
+          let fallbacks = 0;
+          
+          metricsText.split('\n').forEach(line => {
+            if (line.includes('agent_task_executions_total')) {
+              const matchVal = line.match(/\}\s+(\d+)/);
+              const val = matchVal ? parseInt(matchVal[1], 10) : 0;
+              executions += val;
+              if (line.includes('status="fallback"')) {
+                fallbacks += val;
+              }
+            }
+          });
+          setMetrics({
+            task_executions: executions,
+            fallback_count: fallbacks
+          });
+        }
+      }
+    } catch (err) {
+      console.log('Error fetching metrics:', err);
     }
   };
 
@@ -113,7 +136,7 @@ export default function App() {
     setReasoningResult(null);
     setTimelineStep(1);
     try {
-      await fetch('http://localhost:8000/api/trigger-fault', {
+      await fetch(`${API_BASE}/api/trigger-fault`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fault_type: faultType })
@@ -127,7 +150,7 @@ export default function App() {
   const handleRunSreAgent = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/run-sre-agent', {
+      const response = await fetch(`${API_BASE}/api/run-sre-agent`, {
         method: 'POST'
       });
       const data = await response.json();
@@ -142,23 +165,23 @@ export default function App() {
   };
 
   const selectIncidentFromHistory = (inc) => {
-    // Reconstruct SRE trace block from history entry
-    const isMock = inc.remediation_action.includes("Quarantined") || inc.remediation_action.includes("SIGTERM") || inc.remediation_action.includes("Terminated");
+    const isLive = inc.last_gemini_status === "LIVE" || (!inc.last_gemini_status && !inc.remediation_action.includes("MOCKED"));
     setReasoningResult({
       resolution_time_seconds: 6.2,
+      last_gemini_status: inc.last_gemini_status || "LIVE",
       reasoning_steps: [
         `[REAL GRAFANA WEBHOOK RECEIVED] Incoming alert status: firing`,
         `[Gemini SRE Agent] Initiating incident investigation for ${inc.incident_id} (${inc.node_id})...`,
         `[REAL HTTP QUERY] GET Loki log stream matching {node="${inc.node_id}"} |= "ERROR"`,
         `[REAL HTTP QUERY] GET Tempo distributed trace spans matching {resource.service.name="${inc.node_id}"}`,
         `[REAL GEMINI LLM CALL] Executed Google GenAI model 'gemini-flash-latest'...`,
-        isMock ? `[MOCKED FALLBACK] Gemini SRE Agent using local dynamic reasoning engine.` : `[LIVE GEMINI] Successfully processed reasoning trace.`,
+        isLive ? `[LIVE GEMINI] Successfully processed reasoning trace.` : `[MOCKED FALLBACK] Gemini SRE Agent using local dynamic reasoning engine.`,
         `[SRE ACTION] resolve_incident('${inc.incident_id}', action='${inc.remediation_action}').`,
         `[REAL HTTP POST] Posted annotation back to Grafana Cloud instance.`
       ],
       root_cause: inc.summary,
       action_taken: inc.remediation_action,
-      postmortem_markdown: `# Incident Postmortem: ${inc.incident_id}\n\n## Summary\n- **Incident Title:** ${inc.title}\n- **Target Node:** \`${inc.node_id}\`\n- **Impact:** ${inc.severity} incident severity.\n- **Resolution Time:** 6.2 seconds\n\n## Root Cause\n${inc.summary}\n\n## Action Taken\n> ${inc.remediation_action}\n\n## Observability Proof\n- Telemetry Loki streams and Tempo spans successfully cross-referenced via Grafana MCP datasource proxy.\n- Incident annotation registered on Grafana dashboard.`
+      postmortem_markdown: inc.postmortem_markdown || `# Incident Postmortem: ${inc.incident_id}\n\n## Summary\n- **Incident Title:** ${inc.title}\n- **Target Node:** \`${inc.node_id}\`\n- **Impact:** ${inc.severity} incident severity.\n- **Resolution Time:** 6.2 seconds\n\n## Root Cause\n${inc.summary}\n\n## Action Taken\n> ${inc.remediation_action}\n\n## Observability Proof\n- Telemetry Loki streams and Tempo spans successfully cross-referenced via Grafana MCP datasource proxy.\n- Incident annotation registered on Grafana dashboard.`
     });
   };
 

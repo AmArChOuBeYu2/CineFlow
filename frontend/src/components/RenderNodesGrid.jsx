@@ -54,13 +54,24 @@ export default function RenderNodesGrid({ clusterStatus }) {
           <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mt-1">Telemetry Nodes Blade Enclosure</p>
         </div>
         <div>
-          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2.5 py-1 border border-emerald-500/10 rounded-none">
-            HEALTHY: {clusterStatus?.healthy_nodes || 0}/{clusterStatus?.total_nodes || 0}
+          <span className={`text-[10px] font-mono font-bold px-2.5 py-1 border rounded-none ${
+            nodes.length > 0
+              ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10'
+              : 'text-amber-400 bg-amber-500/5 border-amber-500/10'
+          }`}>
+            {nodes.length > 0
+              ? `HEALTHY: ${clusterStatus?.healthy_nodes || 0}/${clusterStatus?.total_nodes || 0}`
+              : 'CONNECTING...'}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {nodes.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 text-xs font-mono uppercase tracking-wider border border-white/5 bg-slate-950/20">
+          Connecting to Render Farm Telemetry Backend...
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {nodes.map((node) => {
           const badge = getStatusBadge(node.status);
           const vramPercent = Math.min(100, Math.round((node.gpu_memory_mb / 24000) * 100));
@@ -138,6 +149,7 @@ export default function RenderNodesGrid({ clusterStatus }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
