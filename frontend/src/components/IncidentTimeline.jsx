@@ -7,7 +7,7 @@ export default function IncidentTimeline({ activeIncident, logs, traces, activeT
       title: '1. ALERT RECEIVED',
       desc: activeIncident 
         ? `Grafana contact point webhook fired for node '${activeIncident.node_id}'`
-        : 'Awaiting alert webhook delivery via ngrok...',
+        : 'Awaiting alert webhook delivery...',
       icon: AlertCircle,
       stepNum: 1,
     },

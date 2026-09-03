@@ -31,11 +31,13 @@ export default function Header({ status }) {
 
       {/* Integration pulse dots & Status Indicators */}
       <div className="flex items-center gap-6">
-        {/* Active Tunnel Status */}
+        {/* Active Backend Connection Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/80 border border-white/5">
           <Radio className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">ngrok: </span>
-          <span className="text-[10px] font-mono text-sky-400 font-semibold">elk-refund-fifty</span>
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Backend: </span>
+          <span className="text-[10px] font-mono text-sky-400 font-semibold">
+            {import.meta.env.VITE_API_URL ? "Render Production" : "Local Engine"}
+          </span>
         </div>
 
         {/* Live Status Indicators */}
