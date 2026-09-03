@@ -1,5 +1,5 @@
 import time
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -91,10 +91,11 @@ def trigger_fault(req: FaultTriggerRequest):
     return result
 
 @app.post("/webhook/grafana-alert")
-async def handle_grafana_alert_webhook(request: Request):
+async def handle_grafana_alert_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Step 3: Official Grafana Alerting Webhook Endpoint.
     Accepts real HTTP POST alerts directly from Grafana Cloud Alerting rules.
+    Handles test notifications instantly and processes investigations via BackgroundTasks.
     """
     try:
         payload = await request.json()
@@ -108,9 +109,16 @@ async def handle_grafana_alert_webhook(request: Request):
         labels = first_alert.get("labels", {})
         annotations = first_alert.get("annotations", {})
         
-        incident_id = f"INC-{labels.get('alertname', 'GRAFANA-ALERT')}-{int(time.time() % 10000)}"
-        node_id = labels.get("node", "render-gpu-04")
+        alertname = labels.get("alertname", "GRAFANA-ALERT")
         summary = annotations.get("summary", annotations.get("description", "Grafana Alert Fired"))
+
+        # Check if this is Grafana's built-in Test Notification payload
+        if alertname in ("TestAlert", "GrafanaTestAlert") or summary in ("Notification test", "Test notification"):
+            print("[GRAFANA TEST NOTIFICATION] Received Grafana test notification. Responding HTTP 200 OK immediately.")
+            return {"status": "test_notification_received", "message": "CineFlow webhook endpoint active and healthy."}
+
+        incident_id = f"INC-{alertname}-{int(time.time() % 10000)}"
+        node_id = labels.get("node", "render-gpu-04")
         
         webhook_incident = {
             "incident_id": incident_id,
@@ -127,9 +135,9 @@ async def handle_grafana_alert_webhook(request: Request):
         # Set the active incident in the simulator so SRE actions and UI sync with it
         simulator.active_incident = webhook_incident
         
-        # Automatically trigger Gemini SRE Agent investigation on real webhook alert
-        sre_result = gemini_sre_agent.investigate_and_remediate(webhook_incident)
-        return {"status": "processed_by_gemini_sre", "result": sre_result}
+        # Schedule Gemini SRE Agent investigation in background to prevent webhook connection timeout
+        background_tasks.add_task(gemini_sre_agent.investigate_and_remediate, webhook_incident)
+        return {"status": "accepted_for_processing", "incident_id": incident_id, "node_id": node_id}
     except Exception as e:
         print(f"[WEBHOOK ERROR] Failed to parse Grafana webhook payload: {e}")
         raise HTTPException(status_code=400, detail=str(e))
