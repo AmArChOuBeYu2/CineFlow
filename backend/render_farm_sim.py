@@ -143,6 +143,7 @@ class RenderFarmSimulator:
 
         if resolved_incident:
             resolved_incident["resolved_at"] = time.strftime("%H:%M:%S")
+            resolved_incident["timestamp_epoch"] = time.time()
             resolved_incident["remediation_action"] = action
             resolved_incident["last_gemini_status"] = self.last_gemini_status
             self.incident_history.append(resolved_incident)

@@ -117,8 +117,19 @@ async def handle_grafana_alert_webhook(request: Request, background_tasks: Backg
             print("[GRAFANA TEST NOTIFICATION] Received Grafana test notification. Responding HTTP 200 OK immediately.")
             return {"status": "test_notification_received", "message": "CineFlow webhook endpoint active and healthy."}
 
-        incident_id = f"INC-{alertname}-{int(time.time() % 10000)}"
+        # Check if an incident for this target node is already actively investigating or resolved < 15s ago
         node_id = labels.get("node", "render-gpu-04")
+        if simulator.active_incident and simulator.active_incident.get("node_id") == node_id:
+            print(f"[DUPLICATE ALERT SKIPPED] Active investigation already running for node '{node_id}'.")
+            return {"status": "duplicate_alert_ignored", "active_incident_id": simulator.active_incident.get("incident_id")}
+
+        if simulator.incident_history:
+            last_inc = simulator.incident_history[-1]
+            if last_inc.get("node_id") == node_id and (time.time() - last_inc.get("timestamp_epoch", 0)) < 15:
+                print(f"[DUPLICATE ALERT SKIPPED] Incident for node '{node_id}' was resolved < 15s ago.")
+                return {"status": "duplicate_alert_cooldown", "last_incident_id": last_inc.get("incident_id")}
+
+        incident_id = f"INC-{alertname}-{int(time.time() % 10000)}"
         
         webhook_incident = {
             "incident_id": incident_id,
@@ -126,6 +137,7 @@ async def handle_grafana_alert_webhook(request: Request, background_tasks: Backg
             "severity": labels.get("severity", "CRITICAL"),
             "source": "Official Grafana Cloud Webhook",
             "timestamp": time.strftime("%H:%M:%S"),
+            "timestamp_epoch": time.time(),
             "node_id": node_id,
             "frame": labels.get("frame", 142),
             "summary": summary,
