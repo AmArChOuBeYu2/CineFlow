@@ -21,6 +21,7 @@ class RenderFarmSimulator:
         self.loki_logs_db = []
         self.tempo_traces_db = []
         self.last_gemini_status = "READY"
+        self.processed_alert_keys = set()
 
     def get_cluster_status(self) -> Dict[str, Any]:
         return {

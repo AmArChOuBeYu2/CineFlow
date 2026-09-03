@@ -117,17 +117,38 @@ async def handle_grafana_alert_webhook(request: Request, background_tasks: Backg
             print("[GRAFANA TEST NOTIFICATION] Received Grafana test notification. Responding HTTP 200 OK immediately.")
             return {"status": "test_notification_received", "message": "CineFlow webhook endpoint active and healthy."}
 
-        # Check if an incident for this target node is already actively investigating or resolved < 15s ago
+        # Construct unique Grafana alert instance key (fingerprint or startsAt + alertname + node)
+        fingerprint = first_alert.get("fingerprint")
+        starts_at = first_alert.get("startsAt", "")
         node_id = labels.get("node", "render-gpu-04")
+        
+        if fingerprint:
+            alert_key = f"fp:{fingerprint}"
+        elif starts_at:
+            alert_key = f"{alertname}:{node_id}:{starts_at}"
+        else:
+            alert_key = f"{alertname}:{node_id}"
+
+        # 1. Deduplication Check: Ignore if this exact alert instance key was already processed
+        if alert_key in simulator.processed_alert_keys:
+            print(f"[DUPLICATE GRAFANA ALERT IGNORED] Alert instance key '{alert_key}' was already processed by Gemini SRE Agent.")
+            return {
+                "status": "duplicate_alert_ignored",
+                "reason": "Grafana alert instance already processed",
+                "alert_key": alert_key
+            }
+
+        # 2. Deduplication Check: Ignore if an incident for this target node is currently actively investigating
         if simulator.active_incident and simulator.active_incident.get("node_id") == node_id:
             print(f"[DUPLICATE ALERT SKIPPED] Active investigation already running for node '{node_id}'.")
-            return {"status": "duplicate_alert_ignored", "active_incident_id": simulator.active_incident.get("incident_id")}
+            return {
+                "status": "duplicate_alert_ignored",
+                "reason": "Active investigation in progress for node",
+                "active_incident_id": simulator.active_incident.get("incident_id")
+            }
 
-        if simulator.incident_history:
-            last_inc = simulator.incident_history[-1]
-            if last_inc.get("node_id") == node_id and (time.time() - last_inc.get("timestamp_epoch", 0)) < 15:
-                print(f"[DUPLICATE ALERT SKIPPED] Incident for node '{node_id}' was resolved < 15s ago.")
-                return {"status": "duplicate_alert_cooldown", "last_incident_id": last_inc.get("incident_id")}
+        # Register this alert instance key as processed
+        simulator.processed_alert_keys.add(alert_key)
 
         incident_id = f"INC-{alertname}-{int(time.time() % 10000)}"
         
