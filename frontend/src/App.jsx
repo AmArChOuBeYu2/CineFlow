@@ -96,9 +96,9 @@ export default function App() {
       console.log('Error fetching history:', err);
     }
 
-    // 3. Fetch and parse Prometheus /api/metrics
+    // 3. Fetch and parse Prometheus /metrics
     try {
-      const resMetrics = await fetch(`${API_BASE}/api/metrics`, fetchOpts);
+      const resMetrics = await fetch(`${API_BASE}/metrics`, fetchOpts);
       if (resMetrics.ok && resMetrics.status !== 304) {
         const metricsText = await resMetrics.text();
         if (metricsText && !metricsText.trim().startsWith('<')) {
