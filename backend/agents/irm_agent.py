@@ -87,16 +87,25 @@ class GeminiSREAgent:
                     raw_llm_response = response.text.strip()
                     print(f"[RAW GEMINI LLM RESPONSE BODY]\n{raw_llm_response[:300]}...\n")
 
-                    # Parse JSON output from Gemini
+                    # Robust JSON parsing for Gemini Flash response (handles unescaped newlines/markdown blocks)
                     clean_text = raw_llm_response
-                    if clean_text.startswith("```json"):
-                        clean_text = clean_text[7:]
-                    if clean_text.startswith("```"):
-                        clean_text = clean_text[3:]
-                    if clean_text.endswith("```"):
-                        clean_text = clean_text[:-3]
+                    if "```" in clean_text:
+                        import re
+                        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", clean_text)
+                        if match:
+                            clean_text = match.group(1).strip()
+                        else:
+                            clean_text = clean_text.replace("```json", "").replace("```", "").strip()
 
-                    result_data = json.loads(clean_text.strip())
+                    try:
+                        result_data = json.loads(clean_text, strict=False)
+                    except Exception:
+                        first_brace = clean_text.find('{')
+                        last_brace = clean_text.rfind('}')
+                        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                            result_data = json.loads(clean_text[first_brace:last_brace+1], strict=False)
+                        else:
+                            raise
                     print("[REAL GEMINI LLM SUCCESS] Gemini Flash generated 100% dynamic live reasoning & postmortem!")
                     
                     # Record metrics

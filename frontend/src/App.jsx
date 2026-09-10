@@ -174,8 +174,8 @@ export default function App() {
         `[Gemini SRE Agent] Initiating incident investigation for ${inc.incident_id} (${inc.node_id})...`,
         `[REAL HTTP QUERY] GET Loki log stream matching {node="${inc.node_id}"} |= "ERROR"`,
         `[REAL HTTP QUERY] GET Tempo distributed trace spans matching {resource.service.name="${inc.node_id}"}`,
-        `[REAL GEMINI LLM CALL] Executed Google GenAI model 'gemini-flash-latest'...`,
-        isLive ? `[LIVE GEMINI] Successfully processed reasoning trace.` : `[MOCKED FALLBACK] Gemini SRE Agent using local dynamic reasoning engine.`,
+        isLive ? `[REAL GEMINI LLM CALL] Executed Google GenAI model 'gemini-flash-latest'...` : `[FALLBACK ENGINE] Executed local dynamic reasoning engine.`,
+        isLive ? `[LIVE GEMINI] Successfully processed reasoning trace.` : `[FALLBACK COMPLETED] Dynamic reasoning generated.`,
         `[SRE ACTION] resolve_incident('${inc.incident_id}', action='${inc.remediation_action}').`,
         `[REAL HTTP POST] Posted annotation back to Grafana Cloud instance.`
       ],
