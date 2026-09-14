@@ -1,12 +1,13 @@
 # 🚨 CineFlow IRM — Autonomous Render Farm & AI Infrastructure Incident Response Manager
 
-> **Devpost Hackathon Submission**: Agentic Cinema: The Blockbuster Hackathon  
-> **Partner Studio Track**: **Grafana Track** ($15,000 Track Pool: $7,500 1st Place)  
+> **Devpost Hackathon Submission**: Agents for Humans Hackathon  
+> **Track**: **Professional Agents**  
+> **Built With**: **Strands Agents SDK**, Google Gemini & Grafana Cloud MCP Server  
 > **License**: Apache 2.0 License
 
-**CineFlow IRM** is an autonomous SRE & Technical Director Agent powered by **Google Gemini** and the **Grafana Cloud MCP Server**. It monitors film render farms (Maya/Houdini/Nuke render nodes) and multi-agent AI pipelines for operational bottlenecks—including GPU memory leaks, silent frame corruption, asset load stalls, and runaway agent loops. 
+**CineFlow IRM** is an autonomous SRE & Technical Director Agent built with the **Strands Agents SDK**, **Google Gemini**, and the **Grafana Cloud MCP Server**. It runs silently in the background monitoring film render farms (Maya/Houdini/Nuke render nodes) and multi-agent AI pipelines for operational bottlenecks—including GPU memory leaks, silent frame corruption, asset load stalls, and runaway agent loops—and surfaces only when critical decision-making or executive sign-offs are needed.
 
-When Grafana triggers an alert, the Gemini Agent automatically investigates Loki logs, analyzes Tempo trace spans via Grafana MCP tools, executes remediation actions (killing worker processes, quarantining bad assets, re-queuing frames), and posts an automated Incident Postmortem.
+When Grafana triggers an alert, the Strands Agent automatically investigates Loki logs, analyzes Tempo trace spans via Grafana MCP tools, executes remediation actions (killing worker processes, quarantining bad assets, re-queuing frames), and posts an automated Incident Postmortem.
 
 ---
 
